@@ -1,0 +1,6 @@
+{
+  "name": "油品密度与体积换算工具",
+  "description": "离线油品温度密度与体积换算工具，支持原油、柴油、汽油、航空燃料、煤油、润滑油、沥青，支持公英制/重容双向多单位自由切换，计算标准密度、VCF、标准体积、桶数、美/英加仑及API度。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

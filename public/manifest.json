@@ -1,0 +1,174 @@
+{
+  "id": "./?source=pwa",
+  "name": "油品密度与体积换算工具",
+  "short_name": "油品换算",
+  "description": "离线油品温度密度与体积换算工具，支持原油、柴油、汽油、航空燃料、煤油、润滑油、沥青，支持公英制/重容双向多单位自由切换。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "minimal-ui",
+    "standalone"
+  ],
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "orientation": "any",
+  "categories": [
+    "utilities",
+    "productivity",
+    "business"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot_mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "油品密度与体积换算移动端计算界面"
+    },
+    {
+      "src": "screenshot_desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "油品密度与体积换算桌面端多指标面板"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "公转英制换算",
+      "short_name": "公转英",
+      "description": "进入公制到英制的换算",
+      "url": "./?source=pwa&system=metric",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "英转公制换算",
+      "short_name": "英转公",
+      "description": "进入英制到公制的换算",
+      "url": "./?source=pwa&system=imperial",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.oilcalc.app",
+      "id": "com.oilcalc.app"
+    }
+  ],
+  "iarc_rating_id": "94ab13ff-78ba-4cbb-a477-8c3afbf4668f",
+  "scope": "./",
+  "scope_extensions": [
+    {
+      "origin": "https://oilcalc-app.web.app"
+    },
+    {
+      "origin": "https://*.oilcalc.app"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./?file",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/json": [".json"]
+      },
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "single-client"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+oilcalc",
+      "url": "./?protocol=%s"
+    }
+  ],
+  "share_target": {
+    "action": "./?share",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "widgets": [
+    {
+      "name": "油品密度与体积换算快捷工具",
+      "short_name": "油品快捷",
+      "description": "提供极简版的油品密度及体积即时换算卡片。",
+      "tag": "oilcalc-shortcut",
+      "template": "widget-template",
+      "data": "widgets/oilcalc-data.json",
+      "type": "text/html",
+      "src": "./?widget=true",
+      "ms_ac_template": "widgets/oilcalc-template.json",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  "note_taking": {
+    "new_note_url": "./?note=new"
+  }
+}
