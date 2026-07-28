@@ -34,7 +34,7 @@ jobs:
         run: npm run build
 
       - name: Build Windows Executable
-        run: npx tauri build
+        run: npx tauri build --target nsis
 
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@v4
@@ -54,6 +54,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev clang cmake
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -69,12 +74,15 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'ndk;25.2.9519653 platforms;android-34 build-tools;34.0.0'
+          packages: 'ndk;26.1.10909125 platforms;android-34 build-tools;34.0.0'
 
-      - name: Accept Licenses & Configure NDK Environment
+      - name: Configure Android NDK Environment
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          NDK_PATH=$(ls -d ${ANDROID_HOME}/ndk/* | tail -n 1)
+          NDK_PATH=$(ls -d ${ANDROID_HOME}/ndk/* 2>/dev/null | tail -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH="${ANDROID_HOME}/ndk/26.1.10909125"
+          fi
           echo "Found NDK at: $NDK_PATH"
           echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
@@ -92,11 +100,11 @@ jobs:
 
       - name: Init and Build Android APK
         run: |
-          npx tauri android init --package-domain com.oilcalculator
+          npx tauri android init --ci
           if [ -f "src-tauri/gen/android/gradlew" ]; then
             chmod +x src-tauri/gen/android/gradlew
           fi
-          npx tauri android build --apk --target aarch64
+          npx tauri android build --apk --target aarch64 --ci
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
