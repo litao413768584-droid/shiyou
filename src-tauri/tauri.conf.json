@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "石油密度与体积换算计算器",
+  "productName": "OilCalculator",
   "version": "1.0.0",
   "identifier": "com.oilcalculator.app",
   "build": {
