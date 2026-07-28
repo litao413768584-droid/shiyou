@@ -5,6 +5,10 @@ description = "石油密度与体积换算计算器"
 authors = ["you"]
 edition = "2021"
 
+[lib]
+name = "oil_calculator_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2.0.0", features = [] }
 
