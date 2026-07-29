@@ -1,4 +1,4 @@
-name: Build Tauri Apps
+﻿name: Build Tauri Apps
 
 on:
   push:
