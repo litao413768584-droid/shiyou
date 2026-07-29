@@ -145,15 +145,14 @@ export function solveStandardDensity15(
 }
 
 /**
- * Calculates all conversion metrics for standard density, VCF, and volume
+ * Calculates all conversion metrics for standard density, VCF, steel expansion, and volume
  */
 export function calculateOilMetrics(input: CalculationInput): CalculationResult {
   const obsDensityKg = input.obsDensity * 1000;
   const category = input.category;
   const refTemp = input.refTemp;
 
-  // Normalize temperature:
-  // For asphalt when refTemp === 60, input.obsTemp is in °F.
+  // 1. Normalize Density Observed Temperature (密度测定温度)
   let obsTempC: number;
   let obsTempF: number;
 
@@ -165,8 +164,22 @@ export function calculateOilMetrics(input: CalculationInput): CalculationResult 
     obsTempF = obsTempC * 1.8 + 32;
   }
 
-  // 1. Solve for standard density at 15°C
-  const { stdDensity15, vcf15 } = solveStandardDensity15(
+  // 2. Normalize Volume Measured Temperature (体积实测温度 / 计量油温)
+  // Default to density observed temperature if not specified
+  const rawVolTemp = input.volTemp !== undefined ? input.volTemp : input.obsTemp;
+  let volTempC: number;
+  let volTempF: number;
+
+  if (category === 'asphalt' && refTemp === 60) {
+    volTempF = rawVolTemp;
+    volTempC = (volTempF - 32) / 1.8;
+  } else {
+    volTempC = rawVolTemp;
+    volTempF = volTempC * 1.8 + 32;
+  }
+
+  // 3. Solve for standard density at 15°C (using density observed temperature)
+  const { stdDensity15 } = solveStandardDensity15(
     obsDensityKg, 
     obsTempC, 
     category, 
@@ -175,32 +188,50 @@ export function calculateOilMetrics(input: CalculationInput): CalculationResult 
   );
 
   let targetStdDensityKg = stdDensity15;
-  let targetVcf = vcf15; // default VCF to 15°C
+  let targetVcf = 1.0; // Oil Volume Correction Factor (VCF) based on volTemp
 
-  // 2. Handle Reference Temperature (15°C, 20°C, or 60°F)
+  // Get coefficient category parameters
+  let K0 = 0;
+  let K1 = 0;
+  switch (category) {
+    case 'crude':
+      K0 = 613.9723;
+      K1 = 0.0;
+      break;
+    case 'gasoline':
+      K0 = 346.7008;
+      K1 = 0.4388;
+      break;
+    case 'diesel':
+    case 'aviation':
+    case 'kerosene':
+      K0 = 103.8720;
+      K1 = 0.7019;
+      break;
+    case 'lube':
+      K0 = 0.0;
+      K1 = 0.6278;
+      break;
+    default:
+      K0 = 103.8720;
+      K1 = 0.7019;
+      break;
+  }
+
+  // 4. Calculate Oil VCF based on Volume Measured Temperature (volTemp)
   if (refTemp === 60) {
     if (category === 'asphalt') {
       targetStdDensityKg = obsDensityKg;
-      // ASTM D4311 Table 2 uses Fahrenheit temperature TF directly
-      const TF = obsTempF;
+      const TF = volTempF;
       const isColumnA = targetStdDensityKg >= 966;
       if (isColumnA) {
-        // Table 2 Column A Formula (60°F Base)
         targetVcf = 1.0211326242 - 3.548988118e-4 * TF + 4.49881e-8 * TF * TF;
       } else {
-        // Table 2 Column B Formula (60°F Base)
         targetVcf = 1.02413769 - 4.0641418e-4 * TF + 6.79176e-8 * TF * TF;
       }
     } else {
-      // General Oil ASTM D1250 60°F Base (Table 6B / Table 6A)
-      const TF = obsTempF;
-      const dTF = TF - 60;
-      let K0 = 103.8720;
-      let K1 = 0.7019;
-      if (category === 'crude') { K0 = 613.9723; K1 = 0; }
-      else if (category === 'gasoline') { K0 = 346.7008; K1 = 0.4388; }
-      else if (category === 'lube') { K0 = 0; K1 = 0.6278; }
-
+      // General Oil ASTM D1250 60°F Base
+      const dTF = volTempF - 60;
       const sg60 = stdDensity15 / 999.012;
       const alpha60 = K0 / (sg60 * sg60 * 999.012 * 999.012) + K1 / (sg60 * 999.012);
       targetVcf = Math.exp(-alpha60 * dTF * (1 + 0.8 * alpha60 * dTF));
@@ -209,13 +240,11 @@ export function calculateOilMetrics(input: CalculationInput): CalculationResult 
   } else if (refTemp === 20) {
     if (category === 'asphalt') {
       const method = input.asphaltMethod ?? 'astm_d4311';
-      // 沥青直接使用输入密度作为标准密度
       targetStdDensityKg = obsDensityKg;
 
       if (method === 'astm_d4311') {
-        // ASTM D4311-04 换算至 20°C 基准: VCF20(T) = VCF15(T) / VCF15(20°C)
         const isColumnA = targetStdDensityKg >= 966;
-        const T = obsTempC;
+        const T = volTempC;
         let vcfT = 1;
         let vcf20 = 1;
         if (isColumnA) {
@@ -229,54 +258,77 @@ export function calculateOilMetrics(input: CalculationInput): CalculationResult 
       } else if (method === 'linear') {
         const gammaG = input.asphaltGamma ?? 0.00064;
         const gammaKg = gammaG * 1000;
-        const dT20 = obsTempC - 20;
-        const obsTempDensity = targetStdDensityKg - gammaKg * dT20;
-        targetVcf = targetStdDensityKg > 0 ? obsTempDensity / targetStdDensityKg : 1;
+        const dT20 = volTempC - 20;
+        const volTempDensity = targetStdDensityKg - gammaKg * dT20;
+        targetVcf = targetStdDensityKg > 0 ? volTempDensity / targetStdDensityKg : 1;
       } else {
-        // gbt1885_54b uses Table 24B (20°C base)
-        const K0 = 103.8720;
-        const K1 = 0.7019;
         const alpha20 = K0 / (targetStdDensityKg * targetStdDensityKg) + K1 / targetStdDensityKg;
-        const dT20 = obsTempC - 20;
+        const dT20 = volTempC - 20;
         targetVcf = Math.exp(-alpha20 * dT20 * (1 + 0.8 * alpha20 * dT20));
       }
     } else {
       // Find density at 20°C from density at 15°C
-      let K0 = 0;
-      let K1 = 0;
-      switch (category) {
-        case 'crude':
-          K0 = 613.9723;
-          K1 = 0.0;
-          break;
-        case 'gasoline':
-          K0 = 346.7008;
-          K1 = 0.4388;
-          break;
-        case 'diesel':
-        case 'aviation':
-        case 'kerosene':
-          K0 = 103.8720;
-          K1 = 0.7019;
-          break;
-        case 'lube':
-          K0 = 0.0;
-          K1 = 0.6278;
-          break;
-      }
-
-      // Convert 15°C density to 20°C density
       const alpha15 = K0 / (stdDensity15 * stdDensity15) + K1 / stdDensity15;
-      const dT_15_to_20 = 20 - 15; // 5 degrees
+      const dT_15_to_20 = 5; // 20 - 15
       const vcf_15_to_20 = Math.exp(-alpha15 * dT_15_to_20 * (1 + 0.8 * alpha15 * dT_15_to_20));
-      
       const stdDensity20 = stdDensity15 * vcf_15_to_20;
       targetStdDensityKg = stdDensity20;
-      targetVcf = obsDensityKg / targetStdDensityKg;
+
+      // Calculate VCF at 20°C for volume temperature volTempC
+      const alpha20 = K0 / (stdDensity20 * stdDensity20) + K1 / stdDensity20;
+      const dT_vol_20 = volTempC - 20;
+      targetVcf = Math.exp(-alpha20 * dT_vol_20 * (1 + 0.8 * alpha20 * dT_vol_20));
+    }
+  } else {
+    // refTemp === 15°C
+    if (category === 'asphalt') {
+      const method = input.asphaltMethod ?? 'astm_d4311';
+      targetStdDensityKg = obsDensityKg;
+      const T = volTempC;
+
+      if (method === 'astm_d4311') {
+        const isColumnA = targetStdDensityKg >= 966;
+        if (isColumnA) {
+          targetVcf = 1.0094684142 - 6.33413410744e-4 * T + 1.45710416212e-7 * T * T;
+        } else {
+          targetVcf = 1.0108020095 - 7.2343515319e-4 * T + 2.1996598346e-7 * T * T;
+        }
+      } else if (method === 'linear') {
+        const gammaG = input.asphaltGamma ?? 0.00064;
+        const gammaKg = gammaG * 1000;
+        const dT15 = volTempC - 15;
+        const volTempDensity = targetStdDensityKg - gammaKg * dT15;
+        targetVcf = targetStdDensityKg > 0 ? volTempDensity / targetStdDensityKg : 1;
+      } else {
+        const alpha15 = K0 / (targetStdDensityKg * targetStdDensityKg) + K1 / targetStdDensityKg;
+        const dT15 = volTempC - 15;
+        targetVcf = Math.exp(-alpha15 * dT15 * (1 + 0.8 * alpha15 * dT15));
+      }
+    } else {
+      // General oil at 15°C base
+      const alpha15 = K0 / (stdDensity15 * stdDensity15) + K1 / stdDensity15;
+      const dT15 = volTempC - 15;
+      targetVcf = Math.exp(-alpha15 * dT15 * (1 + 0.8 * alpha15 * dT15));
+      targetStdDensityKg = stdDensity15;
     }
   }
 
-  // Calculate Volumes
+  // 5. Steel Thermal Expansion Calculation (容器钢热膨胀系数 f_st)
+  // Standard steel cubic thermal expansion coefficient = 3.6e-5 / °C (1.2e-5 * 3)
+  // Reference base temperature T0 (°C)
+  let baseTempC = 20;
+  if (refTemp === 15) baseTempC = 15;
+  if (refTemp === 60) baseTempC = (60 - 32) / 1.8; // ~15.556 °C
+
+  let steelExpansionFactor = 1.0;
+  if (input.enableSteelExpansion) {
+    steelExpansionFactor = 1.0 + 0.000036 * (volTempC - baseTempC);
+  }
+
+  // Combined VCF (Total Correction Factor) = Oil VCF * Steel Expansion Factor
+  const totalVcf = targetVcf * steelExpansionFactor;
+
+  // 6. Calculate Volumes
   const inputVolume = input.volume;
   const inputUnit = input.volumeUnit;
 
@@ -308,44 +360,36 @@ export function calculateOilMetrics(input: CalculationInput): CalculationResult 
 
   const volumeInM3 = volumeInL / 1000;
 
-  // Standard volume = industrial observation volume corrects with VCF (at standard temperature)
-  // Standard volume = Observed Volume * VCF
-  const standardVolumeM3 = volumeInM3 * targetVcf;
-  const standardVolumeL = volumeInL * targetVcf;
+  // Standard volume = Observed Volume * Total VCF
+  const standardVolumeM3 = volumeInM3 * totalVcf;
+  const standardVolumeL = volumeInL * totalVcf;
 
   // Convert Standard Volume to Barrels, US Gallons, UK Gallons
-  // US Barrels = Volume in m³ * 6.28981 (or Liters / 158.9873)
   const barrels = standardVolumeM3 * 6.289811;
-
-  // US Gallons = Volume in m³ * 264.172
   const usGallons = standardVolumeM3 * 264.172052;
-
-  // UK Gallons = Volume in m³ * 219.969
   const ukGallons = standardVolumeM3 * 219.969248;
 
   // Standard weight calculation in Vacuum:
-  // mass = volume * standard density
   const standardWeightKg = standardVolumeL * (targetStdDensityKg / 1000);
   const standardWeightTon = standardWeightKg / 1000;
   const standardWeightLb = standardWeightKg / 0.45359237;
 
-  // Weight in Air with Air Buoyancy Correction (空氣中重量/商業質量):
-  // According to GB/T 1885 standard and general petroleum trade practices:
-  // Weight in Air (kg) = Standard Volume (m³) * (Standard Density (kg/m³) - 1.1)
-  // 1.1 kg/m³ (0.0011 g/cm³) is the standard air density for buoyancy calculation.
+  // Weight in Air with Air Buoyancy Correction:
   const airDensityKg = Math.max(0, targetStdDensityKg - 1.1);
   const airWeightKg = standardVolumeM3 * airDensityKg;
   const airWeightTon = airWeightKg / 1000;
   const airWeightLb = airWeightKg / 0.45359237;
 
-  // API Gravity is based strictly on the standard density at 15°C (relative density / SG)
-  const sg = stdDensity15 / 999.012; // SG relative to water at standard temperature (60°F equivalent)
+  // API Gravity is based strictly on the standard density at 15°C
+  const sg = stdDensity15 / 999.012;
   const apiGravity = (141.5 / sg) - 131.5;
 
   return {
     standardDensityKg: targetStdDensityKg,
     standardDensityG: targetStdDensityKg / 1000,
     vcf: targetVcf,
+    steelExpansionFactor,
+    totalVcf,
     standardVolumeM3,
     standardVolumeL,
     barrels,

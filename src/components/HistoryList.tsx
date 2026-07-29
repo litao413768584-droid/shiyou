@@ -50,13 +50,18 @@ export default function HistoryList({
 
       <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
         {records.map((record) => {
+          const volTempNum = record.input.volTemp !== undefined ? record.input.volTemp : record.input.obsTemp;
+          const tempUnit = record.input.category === 'asphalt' && record.input.refTemp === 60 ? '°F' : '°C';
+          const volTempStr = `${volTempNum}${tempUnit}`;
+          const isSteelEnabled = !!record.input.enableSteelExpansion;
+
           return (
             <div
               key={record.id}
               className="group relative bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80 rounded-xl p-3.5 transition-all duration-200 hover:shadow-md hover:border-indigo-100 dark:hover:border-indigo-900/40"
             >
               <div className="flex items-start justify-between">
-                <div>
+                <div className="w-full">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="px-2 py-0.5 text-[10px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded">
                       {getCategoryLabel(record.input.category).split(' ')[0]}
@@ -64,8 +69,13 @@ export default function HistoryList({
                     <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
                       基准: {record.input.refTemp === 60 ? '60°F' : `${record.input.refTemp}°C`}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-50 relative top-[0.5px]">
-                      • {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {isSteelEnabled && (
+                      <span className="px-1.5 py-0.2 text-[9px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded border border-amber-200/50 dark:border-amber-800/40">
+                        含钢膨
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">
+                      {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
@@ -80,10 +90,11 @@ export default function HistoryList({
                         </div>
 
                         <div className="text-slate-500 dark:text-slate-400 font-sans">
-                          实测温度: <span className="text-slate-800 dark:text-slate-200 font-mono">{record.input.obsTemp} {record.input.refTemp === 60 ? '°F' : '°C'}</span>
+                          实测油温: <span className="text-slate-800 dark:text-slate-200 font-mono">{volTempStr}</span>
                         </div>
                         <div className="text-emerald-600 dark:text-emerald-400 font-semibold text-right font-sans">
-                          标体: <span className="font-mono">{['bbl', 'gal', 'uk_gal', 'lb'].includes(record.input.volumeUnit) ? `${record.result.barrels.toFixed(2)} bbl` : `${record.result.standardVolumeM3.toFixed(3)} m³`}</span>
+                          VCF(油品): <span className="font-mono">{(record.result.vcf ?? 1).toFixed(5)}</span>
+                          <span className="text-slate-400 font-normal font-mono ml-0.5">({volTempStr})</span>
                         </div>
                       </>
                     ) : (
@@ -99,15 +110,59 @@ export default function HistoryList({
                           标密: <span className="font-mono">{record.result.standardDensityG.toFixed(4)} g/cm³</span>
                         </div>
                         <div className="text-emerald-600 dark:text-emerald-400 font-semibold mt-1 text-right font-sans">
-                          标体: <span className="font-mono">{['bbl', 'gal', 'uk_gal', 'lb'].includes(record.input.volumeUnit) ? `${record.result.barrels.toFixed(2)} bbl` : `${record.result.standardVolumeM3.toFixed(3)} m³`}</span>
+                          VCF(油品): <span className="font-mono">{(record.result.vcf ?? 1).toFixed(5)}</span>
+                          <span className="text-slate-400 font-normal font-mono ml-0.5">({volTempStr})</span>
                         </div>
                       </>
                     )}
+                  </div>
 
-                    {/* VCF & API footer info row */}
-                    <div className="col-span-2 text-slate-400 dark:text-slate-500 text-[10px] flex items-center justify-between border-t border-slate-100 dark:border-slate-800/45 pt-1.5 mt-1.5">
-                      <span>VCF 修正系数: <span className="text-emerald-500 dark:text-emerald-400 font-bold font-mono text-[11px]">{(record.result.vcf ?? 1).toFixed(5)}</span></span>
-                      <span>API 度: <span className="font-mono text-slate-700 dark:text-slate-350 font-semibold">{(record.result.apiGravity ?? 0).toFixed(1)}°</span></span>
+                  {/* VCF & Steel Expansion Info Footer */}
+                  <div className="border-t border-slate-100 dark:border-slate-800/45 pt-2 mt-2 space-y-1">
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-slate-400 dark:text-slate-500">标体: </span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono text-[11px]">
+                          {['bbl', 'gal', 'uk_gal', 'lb'].includes(record.input.volumeUnit) 
+                            ? `${record.result.barrels.toFixed(2)} bbl` 
+                            : `${record.result.standardVolumeM3.toFixed(3)} m³`}
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-slate-400 dark:text-slate-500">钢膨系数: </span>
+                        {isSteelEnabled ? (
+                          <>
+                            <span className="text-amber-600 dark:text-amber-400 font-bold font-mono text-[11px]">
+                              {(record.result.steelExpansionFactor ?? 1).toFixed(6)}
+                            </span>
+                            <span className="text-slate-400 dark:text-slate-500 font-mono ml-0.5">
+                              ({volTempStr})
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 font-mono">未启用</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] pt-0.5">
+                      {isSteelEnabled ? (
+                        <div>
+                          <span className="text-slate-400 dark:text-slate-500">综合VCF: </span>
+                          <span className="text-indigo-600 dark:text-indigo-400 font-bold font-mono text-[11px]">
+                            {(record.result.totalVcf ?? record.result.vcf ?? 1).toFixed(5)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-slate-400 text-[9.5px]">无钢热膨胀修正</div>
+                      )}
+                      <div>
+                        <span className="text-slate-400 dark:text-slate-500">API度: </span>
+                        <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold">
+                          {(record.result.apiGravity ?? 0).toFixed(1)}°
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -21,7 +21,10 @@ interface CalculatorFormProps {
 export default function CalculatorForm({ onSaveToHistory, initialInput }: CalculatorFormProps) {
   // 1. Inputs State
   const [category, setCategory] = useState<OilCategory>('diesel');
-  const [obsTemp, setObsTemp] = useState<string>('20.0');
+  const [obsTemp, setObsTemp] = useState<string>('20.0'); // Density measured temperature (视密温度)
+  const [volTemp, setVolTemp] = useState<string>('20.0'); // Volume measured temperature (实测油温)
+  const [isVolTempCustom, setIsVolTempCustom] = useState<boolean>(false); // Whether volTemp is customized
+  const [enableSteelExpansion, setEnableSteelExpansion] = useState<boolean>(false); // Steel thermal expansion toggle
   const [obsDensity, setObsDensity] = useState<string>('0.8350');
   const [densityMode, setDensityMode] = useState<DensityMode>('g'); // 'g' | 'kg' | 'sg' | 'api'
   const [refTemp, setRefTemp] = useState<ReferenceTemperature>(20);
@@ -34,6 +37,16 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
     if (initialInput) {
       setCategory(initialInput.category);
       setObsTemp(initialInput.obsTemp.toString());
+      if (initialInput.volTemp !== undefined) {
+        setVolTemp(initialInput.volTemp.toString());
+        setIsVolTempCustom(initialInput.volTemp !== initialInput.obsTemp);
+      } else {
+        setVolTemp(initialInput.obsTemp.toString());
+        setIsVolTempCustom(false);
+      }
+      if (initialInput.enableSteelExpansion !== undefined) {
+        setEnableSteelExpansion(initialInput.enableSteelExpansion);
+      }
       setObsDensity(initialInput.obsDensity.toString());
       setRefTemp(initialInput.refTemp);
       setVolume(initialInput.volume.toString());
@@ -48,6 +61,20 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
       }
     }
   }, [initialInput]);
+
+  // Handle density observed temperature change
+  const handleObsTempChange = (val: string) => {
+    setObsTemp(val);
+    if (!isVolTempCustom) {
+      setVolTemp(val);
+    }
+  };
+
+  // Sync volume temperature with density temperature
+  const handleSyncVolTemp = () => {
+    setVolTemp(obsTemp);
+    setIsVolTempCustom(false);
+  };
 
   // Handle Reference Temperature Change with automatic unit/temperature conversion for asphalt
   const handleRefTempChange = (newRef: ReferenceTemperature) => {
@@ -155,6 +182,7 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
 
   // Parsing & Calculating reactive values
   const parsedTemp = parseFloat(obsTemp) || 0;
+  const parsedVolTemp = parseFloat(volTemp) !== undefined && !isNaN(parseFloat(volTemp)) ? parseFloat(volTemp) : parsedTemp;
   const parsedVolume = parseFloat(volume) || 0;
 
   const currentInput: CalculationInput = {
@@ -166,6 +194,8 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
     volumeUnit,
     densityMode,
     asphaltMethod: 'astm_d4311',
+    volTemp: parsedVolTemp,
+    enableSteelExpansion,
   };
 
   // Perform Calculation
@@ -191,9 +221,10 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
     }
   };
 
-  // Quick temperature adjustments
+  // Quick density temperature adjustments
   const handleQuickTemp = (val: number) => {
-    setObsTemp(val.toFixed(1));
+    const strVal = val.toFixed(1);
+    handleObsTempChange(strVal);
   };
 
   return (
@@ -415,12 +446,12 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
           ) : null}
         </div>
 
-        {/* Input: Observed Temp (实测温度) */}
+        {/* Input: Density Observed Temp (视密测定温度) */}
         <div>
           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 flex items-center justify-between">
             <span className="flex items-center gap-1">
               <Thermometer className="w-3.5 h-3.5 text-orange-500" />
-              {category === 'asphalt' && refTemp === 60 ? '实测温度 (°F 华氏度)' : '实测温度 (°C)'}
+              {category === 'asphalt' && refTemp === 60 ? '视密温度 (°F)' : '视密测定温度 (°C)'}
             </span>
             {category === 'asphalt' && refTemp === 60 && (
               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-medium">
@@ -433,7 +464,7 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
               type="number"
               step="0.1"
               value={obsTemp}
-              onChange={(e) => setObsTemp(e.target.value)}
+              onChange={(e) => handleObsTempChange(e.target.value)}
               className="w-full bg-transparent px-3 py-2 text-sm font-semibold font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
             />
           </div>
@@ -499,9 +530,9 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
           </span>
         </div>
 
-        {/* Input: Observed Volume (体积 / 重量) */}
-        <div className="col-span-2 border-t border-slate-100 dark:border-slate-800/50 pt-3">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 mb-2">
+        {/* Input: Observed Volume & Temperature (实测数量/体积、计量温度、钢膨选项) */}
+        <div className="col-span-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5">
             <label className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <Database className="w-3.5 h-3.5 text-teal-500" />
               实测数量 ({['kg', 't', 'lb'].includes(volumeUnit) ? '重量 Wt' : '体积 Vol'})
@@ -540,6 +571,7 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
               )}
             </div>
           </div>
+
           <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800/80 font-mono">
             <input
               type="number"
@@ -549,6 +581,103 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
               placeholder="100.0"
               className="w-full bg-transparent px-3 py-2 text-sm font-semibold rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
             />
+          </div>
+
+          {/* Sub-card: Volume Temperature & Steel Thermal Expansion Toggle */}
+          <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 p-3 rounded-xl space-y-3">
+            
+            {/* Volume Measured Temperature (实测体积油温) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                  <Thermometer className="w-3.5 h-3.5 text-teal-500" />
+                  实测体积温度 / 油罐油温 ({category === 'asphalt' && refTemp === 60 ? '°F' : '°C'})
+                </label>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                  体积修正系数 (VCF) 按照此温度计算
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isVolTempCustom ? (
+                  <button
+                    type="button"
+                    onClick={handleSyncVolTemp}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer"
+                  >
+                    同步视密温度 ({obsTemp}°)
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                    与视密温度同步
+                  </span>
+                )}
+                <div className="w-28 relative rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={volTemp}
+                    onChange={(e) => {
+                      setVolTemp(e.target.value);
+                      setIsVolTempCustom(true);
+                    }}
+                    className="w-full bg-transparent px-2.5 py-1.5 text-xs font-bold font-mono text-right rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Presets for Volume Temperature */}
+            <div className="flex flex-wrap items-center gap-1 border-t border-slate-200/40 dark:border-slate-800/40 pt-2">
+              <span className="text-[10px] text-slate-400 mr-1">快捷设温:</span>
+              {(category === 'asphalt'
+                ? (refTemp === 60 ? [70, 250, 280, 300, 320, 340, 360] : [20, 120, 130, 140, 150, 160, 170, 180])
+                : [-10, 0, 15, 20, 25, 35]
+              ).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    setVolTemp(t.toFixed(1));
+                    setIsVolTempCustom(true);
+                  }}
+                  className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded cursor-pointer transition ${
+                    parsedVolTemp === t 
+                      ? 'bg-teal-600 text-white font-bold' 
+                      : 'bg-white dark:bg-slate-800 text-slate-500 hover:text-teal-600 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {t > 0 && '+'}{t}°
+                </button>
+              ))}
+            </div>
+
+            {/* Steel Thermal Expansion Option (计算钢膨) */}
+            <div className="border-t border-slate-200/40 dark:border-slate-800/40 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableSteelExpansion}
+                    onChange={(e) => setEnableSteelExpansion(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span>计算容器钢热膨胀 (钢膨)</span>
+                </label>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 ml-5">
+                  钢膨温度为体积温度 ({volTemp}{category === 'asphalt' && refTemp === 60 ? '°F' : '°C'})，体膨系数 β = 3.6×10⁻⁵ /°C
+                </span>
+              </div>
+
+              <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md self-start sm:self-center ${
+                enableSteelExpansion
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                  : 'bg-slate-200/60 dark:bg-slate-800 text-slate-400'
+              }`}>
+                {enableSteelExpansion ? '已启用钢膨修正' : '不计算钢膨'}
+              </span>
+            </div>
+
           </div>
         </div>
 
@@ -599,13 +728,40 @@ export default function CalculatorForm({ onSaveToHistory, initialInput }: Calcul
               {/* Output 3: VCF Factor */}
               <div className="bg-white/5 border border-white/5 rounded-xl p-3">
                 <span className="text-[10px] text-indigo-200 font-bold tracking-wider block mb-0.5">
-                  体积修正系数 (VCF)
+                  油品体积修正系数 (VCF)
                 </span>
                 <span className="text-lg font-black font-mono text-emerald-300">
                   {result.vcf.toFixed(5)}
                 </span>
-                <span className="text-[9px] text-indigo-300/85 block mt-0.5 font-sans leading-none">依据 {getVcfStandardLabel(category, refTemp, currentInput.asphaltMethod, currentInput.asphaltGamma)}</span>
+                <span className="text-[9px] text-indigo-300/85 block mt-0.5 font-sans leading-none">
+                  依据 {getVcfStandardLabel(category, refTemp, currentInput.asphaltMethod, currentInput.asphaltGamma)} (@{parsedVolTemp}{category === 'asphalt' && refTemp === 60 ? '°F' : '°C'})
+                </span>
               </div>
+
+              {/* Output 3b: Steel Expansion Factor if enabled */}
+              {enableSteelExpansion && (
+                <div className="col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-amber-200 font-bold tracking-wider block mb-0.5">
+                      容器钢膨系数 (f_st)
+                    </span>
+                    <span className="text-lg font-black font-mono text-amber-300">
+                      {result.steelExpansionFactor.toFixed(6)}
+                    </span>
+                    <span className="text-[9px] text-amber-300/80 block mt-0.5">
+                      钢罐温度: {parsedVolTemp}{category === 'asphalt' && refTemp === 60 ? '°F' : '°C'}
+                    </span>
+                  </div>
+                  <div className="text-right border-l border-amber-500/20 pl-4">
+                    <span className="text-[10px] text-indigo-200 font-bold tracking-wider block mb-0.5">
+                      综合体积修正系数 (VCF_total)
+                    </span>
+                    <span className="text-xl font-black font-mono text-white">
+                      {result.totalVcf.toFixed(5)}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Output 4: Standard Volume */}
               <div className="col-span-2 bg-gradient-to-r from-emerald-950/40 to-indigo-950/40 border border-emerald-500/10 rounded-xl p-3.5">
