@@ -1,3 +1,5 @@
+name: Build Tauri Apps
+
 on:
   push:
     branches: [ main ]
@@ -21,13 +23,12 @@ jobs:
           targets: x86_64-pc-windows-msvc
       
       - name: Install NSIS
-<<<<<<< HEAD:.github/workflows/build.yml
-        run: |
-    curl -L -o nsis-setup.exe https://sourceforge.net/projects/nsis/files/NSIS%203/3.08/nsis-3.08-setup.exe/download
-    start /wait nsis-setup.exe /S
-=======
         run: choco install nsis
->>>>>>> e68584d28adf16e0100cf13a2adadaf057c296d8:.github/workflows/tauri-build.yml
+      
+      - name: Debug and recreate tauri.conf.json
+        run: |
+          echo '{"$schema":"https://schema.tauri.app/config/2","productName":"shiyou","version":"0.1.0","identifier":"com.shiyou.app","build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},"app":{"windows":[{"title":"й╞ся"}]},"bundle":{"icon":[]}}' > src-tauri/tauri.conf.json
+          cat src-tauri/tauri.conf.json
       
       - name: Install dependencies
         run: npm install
@@ -72,6 +73,11 @@ jobs:
       
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+      
+      - name: Debug and recreate tauri.conf.json
+        run: |
+          echo '{"$schema":"https://schema.tauri.app/config/2","productName":"shiyou","version":"0.1.0","identifier":"com.shiyou.app","build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},"app":{"windows":[{"title":"й╞ся"}]},"bundle":{"icon":[]}}' > src-tauri/tauri.conf.json
+          cat src-tauri/tauri.conf.json
       
       - name: Generate icons
         run: npx tauri icon
