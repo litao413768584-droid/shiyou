@@ -23,7 +23,9 @@ jobs:
           targets: x86_64-pc-windows-msvc
       
       - name: Install NSIS
-        run: choco install nsis --version=3.0.4
+        run: |
+    curl -L -o nsis-setup.exe https://sourceforge.net/projects/nsis/files/NSIS%203/3.08/nsis-3.08-setup.exe/download
+    start /wait nsis-setup.exe /S
       
       - name: Install dependencies
         run: npm install
