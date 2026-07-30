@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">油品密度与体积换算工具</string>
+    <string name="title_activity_main">油品密度与体积换算工具</string>
+    <string name="package_name">com.oilcalc.app</string>
+    <string name="custom_url_scheme">com.oilcalc.app</string>
+</resources>
