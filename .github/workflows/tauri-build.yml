@@ -1,40 +1,95 @@
-build-windows:
-  runs-on: windows-latest
-  steps:
-    - uses: actions/checkout@v4
+name: Build Tauri Apps
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'npm'
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-    - name: Install Rust stable
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: x86_64-pc-windows-msvc
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Install NSIS
-      run: choco install nsis
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
-    - name: Setup NSIS path
-      run: echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
-    - name: Debug and recreate tauri.conf.json
-      run: |
-        echo '{"$schema":"https://schema.tauri.app/config/2","productName":"shiyou","version":"0.1.0","identifier":"com.shiyou.app","build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},"app":{"windows":[{"title":"й╞ся"}]},"bundle":{"icon":[],"targets":["nsis","msi"],"windows":{"certificateThumbprint":null,"digestAlgorithm":"sha256","timestampUrl":""}}}' > src-tauri/tauri.conf.json
-        cat src-tauri/tauri.conf.json
+      - name: Install NSIS
+        run: choco install nsis
 
-    - name: Install dependencies
-      run: npm install
+      - name: Setup NSIS path
+        run: echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
-    - name: Generate icons
-      run: npx tauri icon
+      - name: Debug and recreate tauri.conf.json
+        run: |
+          echo '{"$schema":"https://schema.tauri.app/config/2","productName":"shiyou","version":"0.1.0","identifier":"com.shiyou.app","build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},"app":{"windows":[{"title":"й╞ся"}]},"bundle":{"icon":[],"targets":["nsis","msi"],"windows":{"certificateThumbprint":null,"digestAlgorithm":"sha256","timestampUrl":""}}}' > src-tauri/tauri.conf.json
+          cat src-tauri/tauri.conf.json
 
-    - name: Build Windows EXE
-      run: npx tauri build --target x86_64-pc-windows-msvc
+      - name: Install dependencies
+        run: npm install
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: windows-executable
-        path: src-tauri/target/release/oil-calculator.exe
+      - name: Generate icons
+        run: npx tauri icon
+
+      - name: Build Windows EXE
+        run: npx tauri build --target x86_64-pc-windows-msvc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: src-tauri/target/release/oil-calculator.exe
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Debug and recreate tauri.conf.json
+        run: |
+          echo '{"$schema":"https://schema.tauri.app/config/2","productName":"shiyou","version":"0.1.0","identifier":"com.shiyou.app","build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},"app":{"windows":[{"title":"й╞ся"}]},"bundle":{"icon":[]}}' > src-tauri/tauri.conf.json
+          cat src-tauri/tauri.conf.json
+
+      - name: Generate icons
+        run: npx tauri icon
+
+      - name: Initialize Android project
+        run: npx tauri android init
+
+      - name: Build Android APK
+        run: npx tauri android build --apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
