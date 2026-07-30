@@ -45,7 +45,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-executable
-          path: src-tauri/target/release/oil-calculator.exe
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/oil-calculator.exe
 
   build-android:
     runs-on: ubuntu-latest
