@@ -1,5 +1,3 @@
-name: Build Tauri Apps
-
 on:
   push:
     branches: [ main ]
@@ -23,9 +21,13 @@ jobs:
           targets: x86_64-pc-windows-msvc
       
       - name: Install NSIS
+<<<<<<< HEAD:.github/workflows/build.yml
         run: |
     curl -L -o nsis-setup.exe https://sourceforge.net/projects/nsis/files/NSIS%203/3.08/nsis-3.08-setup.exe/download
     start /wait nsis-setup.exe /S
+=======
+        run: choco install nsis
+>>>>>>> e68584d28adf16e0100cf13a2adadaf057c296d8:.github/workflows/tauri-build.yml
       
       - name: Install dependencies
         run: npm install
