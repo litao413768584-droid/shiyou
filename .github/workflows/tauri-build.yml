@@ -23,7 +23,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
       
       - name: Install NSIS
-        run: choco install nsis --version=3.0.4
+        run: choco install nsis
       
       - name: Install dependencies
         run: npm install
