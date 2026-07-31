@@ -1,0 +1,147 @@
+﻿name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 设置 Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+      - name: 安装依赖
+        run: bun install
+
+      - name: 构建前端
+        run: bun run build
+
+      - name: 设置 Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 设置 Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.13
+
+      - name: 生成应用图标和启动画面
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install pillow
+          
+          python3 << 'EOF'
+          import os
+          from PIL import Image, ImageDraw, ImageFont
+          
+          # 1. 生成应用图标 (所有 mipmap 目录)
+          sizes = [
+              ('mipmap-mdpi', 48),
+              ('mipmap-hdpi', 72),
+              ('mipmap-xhdpi', 96),
+              ('mipmap-xxhdpi', 144),
+              ('mipmap-xxxhdpi', 192),
+          ]
+          
+          bg_color = (33, 150, 243)
+          text_color = (255, 255, 255)
+          
+          for folder, size in sizes:
+              path = f'android/app/src/main/res/{folder}'
+              os.makedirs(path, exist_ok=True)
+              
+              img = Image.new('RGB', (size, size), color=bg_color)
+              draw = ImageDraw.Draw(img)
+              try:
+                  font = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', size//2)
+              except:
+                  font = ImageFont.load_default()
+              draw.text((size//2, size//2), 'A', fill=text_color, anchor='mm', font=font)
+              img.save(f'{path}/ic_launcher.png')
+              
+              img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+              draw = ImageDraw.Draw(img)
+              draw.ellipse([0, 0, size-1, size-1], fill=bg_color)
+              draw.text((size//2, size//2), 'A', fill=text_color, anchor='mm', font=font)
+              img.save(f'{path}/ic_launcher_round.png')
+              
+              img = Image.new('RGB', (size, size), color=(255, 255, 255))
+              draw = ImageDraw.Draw(img)
+              draw.text((size//2, size//2), 'A', fill=bg_color, anchor='mm', font=font)
+              img.save(f'{path}/ic_launcher_foreground.png')
+          
+          # 2. 生成启动画面 (所有 drawable 目录)
+          splash_configs = [
+              ('drawable', 800, 600),
+              ('drawable-land-mdpi', 800, 600),
+              ('drawable-port-mdpi', 600, 800),
+              ('drawable-land-hdpi', 1200, 900),
+              ('drawable-port-hdpi', 900, 1200),
+              ('drawable-land-xhdpi', 1600, 1200),
+              ('drawable-port-xhdpi', 1200, 1600),
+              ('drawable-land-xxhdpi', 2400, 1800),
+              ('drawable-port-xxhdpi', 1800, 2400),
+              ('drawable-land-xxxhdpi', 3200, 2400),
+              ('drawable-port-xxxhdpi', 2400, 3200),
+          ]
+          
+          for folder, width, height in splash_configs:
+              path = f'android/app/src/main/res/{folder}'
+              os.makedirs(path, exist_ok=True)
+              
+              img = Image.new('RGB', (width, height), color=(33, 150, 243))
+              draw = ImageDraw.Draw(img)
+              
+              try:
+                  font_size = min(width, height) // 8
+                  font = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', font_size)
+              except:
+                  font = ImageFont.load_default()
+              
+              draw.text((width//2, height//2 - 40), 'Welcome', fill=(255, 255, 255), anchor='mm', font=font)
+              draw.text((width//2, height//2 + 60), 'Loading...', fill=(200, 200, 255), anchor='mm', font=font)
+              
+              img.save(f'{path}/splash.png')
+          
+          print("所有图片生成成功!")
+          EOF
+
+      - name: 添加 Android 平台
+        run: npx cap add android
+
+      - name: 同步 Capacitor
+        run: npx cap sync android
+
+      - name: 构建 Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/debug/*.apk
